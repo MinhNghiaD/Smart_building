@@ -1,0 +1,12 @@
+{
+    "name": "Network_Smart_building",
+    "description": "This project is a networking project for IoTs smart building. Using MQTT protocol as an application protocol for communication between gateway in the same network",
+    "version": "0.0.1",
+    "dependencies": {},
+    "node-red": {
+        "settings": {
+            "flowFile": "flows_raspberrypi.json",
+            "credentialsFile": "flows_raspberrypi_cred.json"
+        }
+    }
+}
