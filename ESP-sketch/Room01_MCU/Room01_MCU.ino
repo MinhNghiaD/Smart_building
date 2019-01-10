@@ -4,7 +4,7 @@
  * This Ketch yse function in network.h head file to connect to Wifi and MQTT server and functions in sensor.h to take data from sensor
  * It controls the temperature, humidity and light in the room
  * The NodeMCU will reveive the data from DHT11 sensor and send back data to the server to be stored in InfuxDB database
- * When activated by the server, the heater will maintain the temperature in the room between 17°C and 26°C
+ * When activated by the server, the heater will maintain the temperature in the room between 17°C and 26°C if there is a presence in the room
  * And the Lamp will be controled by a switch on the dashboard
  * 
  */
@@ -15,12 +15,14 @@
 #define DHTpin 5         //connect DHT11 to GPIO5
 #define lamp 4           //connect LED to GPIO4 
 #define relay 16         //connect Relay to GPIO16(D0)
+#define PIR_sensor 0     //connect PIR sensor to pin GPIO0
 #define DHTTYPE DHT11    
 
-int now = millis();
+int now = millis();                 //started time
 int previous = 0;
-static int heater_switch = 0;       //switch of heater
-static int heater_state = 0;        //state of heater
+static int lamp_switch = 0;
+static int heater_switch = 0;       //switch of heater ----> Command from server ON or OFF
+static int heater_state = 0;        //state of heater  ----> State of Heater ON or OFF
 
 DHT dht(DHTpin, DHTTYPE);     //Initialise DHT object
 char DHT_buffer[40];  
@@ -39,7 +41,9 @@ int port = 1883;
 //subscribe to 2 topic Lamp and Heater
 char* topic[] = {"Room01/Lamp/Activated", "Room01/Heater/Activated"};           
 unsigned int nb_topic = 2;
-char clientID[] = "NodeMCU01";
+char clientID[] = "SC-NodeMCU01";                         //Restrict Client ID by prefix SC-
+char mqtt_username[] = "nodemcu";                              //login and password for mosquitto broker
+char mqtt_password[] = "esp8266";
 PubSubClient client(MQTT_Server, port, wificlient);       //Constructor of PubSubClient object
 
 
@@ -62,11 +66,13 @@ void callback(String topic, byte* payload, unsigned int length)
     if(message == "1")      //ON
     {
       digitalWrite(lamp, HIGH);
+      lamp_switch = 1;
       Serial.println("On");
     }
     else if(message == "0")    //OFF
     {
       digitalWrite(lamp, LOW);
+      lamp_switch = 0;
       Serial.println("Off");
     }
     else
@@ -99,7 +105,11 @@ void callback(String topic, byte* payload, unsigned int length)
 
 /*--------------------------------------------SET UP----------------------------------------------------------*/
 void setup() {
+  //set up input
   pinMode(DHTpin, INPUT);     
+  pinMode(PIR_sensor, INPUT);
+
+  //set up output
   pinMode(lamp, OUTPUT);
   pinMode(relay, OUTPUT);
   digitalWrite(relay, LOW);                         //lock by default
@@ -111,35 +121,56 @@ void setup() {
 
 /*--------------------------------------------LOOP------------------------------------------------------------*/
 void loop() {
-  MQTT_connect(client, clientID, topic, nb_topic);
+  MQTT_connect(client, clientID, mqtt_username, mqtt_password, topic, nb_topic);        //verify connection with MQTT broker
   now = millis();
-  if(now-previous >= 30000)
+  int motion = digitalRead(PIR_sensor);         //motion detection
+    
+    //lamp reaction when motion detected
+   if(motion == HIGH)
+   {
+     if(lamp_switch == 1)
+     {
+       digitalWrite(lamp, HIGH);
+     }
+     if(now-previous >= 5000)
+     {
+        client.publish("Room01/Motion", "1");        //publish state to topic in after time interval 
+     }
+     
+   }
+   else if(now-previous >= 5000)
+   {
+     digitalWrite(lamp, LOW);
+     client.publish("Room01/Motion", "0");        //publish state to topic in after time interval
+   }
+    
+  if(now-previous >= 5000)                               //idle in 30 senconds
   {
-    previous = now;
+    previous = now;               //reset clock
     if(!read_DHT(dht, &data))     //attemp to read data from DHT11
     {
        Serial.println("Fail to read from HDT11");
-       return;                    //break the loop
+       return;                                    //if false to read from sensor -----> break the loop
     }
+    
     Serial.println(heater_state);
-    if(heater_switch==1)
+    
+    if(heater_switch==1)      //only when turned on by server
     {
-      
-       if(data.temperature < 23 && !heater_state)             //turn on heater
-       {
-          digitalWrite(relay, HIGH);
-          heater_state = 1;
-          client.publish("Room01/Heater/State", "1");        //publish state to topic
-          Serial.println("heater on");
-       }
-       else if(data.temperature > 25 && heater_state)         //turn off heater
-       {
-          digitalWrite(relay, LOW);
-          heater_state = 0;
-          client.publish("Room01/Heater/State", "0");         //publish state to topic
-          Serial.println("heater off");
-       }
-      
+         if(data.temperature < 23 && !heater_state && motion==HIGH)             //turn on heater if it's off and temperature lower than 23°C and there is presence in the room
+         {
+            digitalWrite(relay, HIGH);
+            heater_state = 1;
+            client.publish("Room01/Heater/State", "1");        //publish heater state to topic
+            Serial.println("heater on");
+         }
+         else if((data.temperature > 25 || motion==LOW) && heater_state)         //turn off heater if it's on and temperature higher than 25°C or there is no presence in the room
+         {
+            digitalWrite(relay, LOW);
+            heater_state = 0;
+            client.publish("Room01/Heater/State", "0");         //publish state to topic
+            Serial.println("heater off");
+         }
     }
     //convert DHT data to string
     String buffer;
@@ -152,17 +183,5 @@ void loop() {
     
     client.publish("Room01/DHT11", DHT_buffer);
     Serial.println(buffer);
-  
-    /*
-    dtostrf(data.temperature, 3, 2, temperature);
-    
-    dtostrf(data.humidity, 3, 2, humidity);
-    client.publish("Room01/Humidity", humidity);
-    Serial.print("Temperature: ");
-    Serial.println(data.temperature);
-    Serial.print("Humidity: ");
-    Serial.println(data.humidity);
-   
-    */
   }
 }
