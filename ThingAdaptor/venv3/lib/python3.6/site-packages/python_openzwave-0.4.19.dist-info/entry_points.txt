@@ -1,0 +1,4 @@
+[console_scripts]
+pyozw_check = python_openzwave.scripts.pyozw_check:main
+pyozw_shell = python_openzwave.scripts.pyozw_shell:main
+
