@@ -115,7 +115,7 @@ def removeFailedNode(controller, node_id):
     controller.remove_failed_node(nodeid)
 
 def removeNode(controller, node_id):
-    controller.remove_node()
+    controller.remove_node(node_id)
 
 def cancelCommand(controller):
     controller.cancel_command()
@@ -314,7 +314,7 @@ def getProtections(node):
 
 #function for channels
 #sensors
-def getSesor_value(value_id):
+def getSensor_value(value_id):
     return get_sensor_value(value_id)
 
 #derivative for dimmers
@@ -356,7 +356,7 @@ def setUser_code(value_id, value):
 def setDoorlock_value(value_id, value):
     #lock = true, unlock= false
     set_doorlock(value_id, value)
-'''
+
 network = createNetwork(options, log=None, autostart=True, kvals=True)
 print("***********************************************************************")
 for node in network.nodes:  #dict() of nodes
@@ -401,4 +401,3 @@ for node in network.nodes:
         print("  label/help : {}/{}".format(network.nodes[node].values[val].label,network.nodes[node].values[val].help))
         print("  id on the network : {}".format(network.nodes[node].values[val].id_on_network))
         print("  state: {}".format(network.nodes[node].get_switch_state(val)))
-'''
