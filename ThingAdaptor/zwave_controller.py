@@ -17,6 +17,7 @@ from openzwave.network import ZWaveNetwork
 from openzwave.option import ZWaveOption
 import time
 
+
 device="/dev/ttyACM0"                       #COM port of device, normally ttyUSB0, if not exist => switch to ttyACM0
 log="Debug"
 
@@ -31,8 +32,8 @@ for arg in sys.argv:
         logging.log("  --log=Info|Debug")
 
 
-class Controller:
 
+class Controller:
     def __init__(self):
         #super(, self).__init__()
         options = ZWaveOption(device, \
@@ -115,6 +116,7 @@ class Controller:
         return controller.neighbors
 
 class Node:
+    '''Base class of other zwave nodes in network'''
     def __init__(self, node):
         self.node = node
 
@@ -152,6 +154,7 @@ class Node:
     def getBattery_level(self):
         return self.node.get_battery_levels()
 
+class
 
 def main():
     controller = Controller()
